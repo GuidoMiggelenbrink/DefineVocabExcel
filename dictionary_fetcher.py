@@ -1,9 +1,7 @@
 import requests
 from lxml import html
 
-# global variables
 DEBUG_MODE = False  # True, open webpage file (offline). False, request url (online).
-
 
 class CambridgeDictionaryFetcher:
     def __init__(self):
@@ -12,9 +10,7 @@ class CambridgeDictionaryFetcher:
     def fetch_webpage(self, url):
         """On success, return the webpage as HTML. On failure, return None."""
         if not DEBUG_MODE:
-            HEADER = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.5005.63 Safari/537.36"
-            }
+            HEADER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.5005.63 Safari/537.36"}
             webpage = requests.get(url, headers=HEADER)
 
             if webpage.status_code == 200:
@@ -24,11 +20,7 @@ class CambridgeDictionaryFetcher:
                 return None
 
         else:  # Debug mode
-            with open(
-                r"C:\Users\guido\Desktop\translator\env\debug_site.html",
-                "r",
-                encoding="utf-8",
-            ) as file:
+            with open(r"C:\Users\guido\Desktop\translator\env\debug_site.html", "r", encoding="utf-8", ) as file:
                 webpage = file.read()
 
             if webpage:
@@ -78,12 +70,8 @@ class CambridgeDictionaryFetcher:
         --------
             html_ddef_blocks (list) : list containing lxml.html.HtmlElement objects.
         """
-        XPATH_QUERY_DDEF_BLOCK = (
-            './/div[contains(@class,"ddef_block")]'  # return all defintion blocks
-        )
-        html_ddef_blocks = html_object.xpath(
-            XPATH_QUERY_DDEF_BLOCK
-        )  # if a word has only one type, then there is no dlink element.
+        XPATH_QUERY_DDEF_BLOCK = ('.//div[contains(@class,"ddef_block")]')  # return all defintion blocks
+        html_ddef_blocks = html_object.xpath(XPATH_QUERY_DDEF_BLOCK)  # if a word has only one type, then there is no dlink element.
 
         return html_ddef_blocks
 
@@ -102,85 +90,66 @@ class CambridgeDictionaryFetcher:
         """
         XPATH_QUERY_DDEF_D = './/div[contains(@class,"ddef_d")]'
         html_ddef_ds = html_ddef_blocks.xpath(XPATH_QUERY_DDEF_D)  # find defintions
-        str_defintions = "\n".join(
-            [" ".join(element.text_content().split()) for element in html_ddef_ds]
-        )
+        str_defintions = "\n".join([" ".join(element.text_content().split()) for element in html_ddef_ds])
 
         return str_defintions
 
     def _parse_examples(self, html_ddef_blocks):
         XPATH_QUERY_DEXAMP = './/div[contains(@class, "dexamp")]'
         html_dexamps = html_ddef_blocks.xpath(XPATH_QUERY_DEXAMP)  # find examples
-        str_examples = "\n".join(
-            [" ".join(element.text_content().split()) for element in html_dexamps]
-        )
+        str_examples = "\n".join([" ".join(element.text_content().split()) for element in html_dexamps])
 
         return str_examples
 
     def _parse_translations(self, html_ddef_blocks):
         XPATH_QUERY_DTRANS = './/span[@class="trans dtrans"]'
         html_dtrans = html_ddef_blocks.xpath(XPATH_QUERY_DTRANS)  # find translations
-        str_translations = "\n".join(
-            [" ".join(element.text_content().split()) for element in html_dtrans]
-        )  # first .join() puts each distinct translation on a new line, the second removes all multiple white spaces from the html elemtn, which is first converted to text(means all syntax is stripped off).
+        str_translations = "\n".join([" ".join(element.text_content().split()) for element in html_dtrans])  # first .join() puts each distinct translation on a new line, the second removes all multiple white spaces from the html elemtn, which is first converted to text(means all syntax is stripped off).
 
         return str_translations
 
     def fetch_enLearner_dictionary(self, word):
-        try:
-            self.word = word
-            self.url_enLearners = f"https://dictionary.cambridge.org/dictionary/learner-english//{self.word}"  # url Cambridge Learner dictionary EN
-            self.url_en = f"https://dictionary.cambridge.org/dictionary/english/{self.word}"  # url Cambridge dictionary EN
+        self.word = word
+        self.url_enLearners = f"https://dictionary.cambridge.org/dictionary/learner-english//{self.word}"  # url Cambridge Learner dictionary EN
+        self.url_en = f"https://dictionary.cambridge.org/dictionary/english/{self.word}"  # url Cambridge dictionary EN
 
-            def_blocks = []
+        def_blocks = []
 
-            webpage = self.fetch_webpage(self.url_enLearners)
+        webpage = self.fetch_webpage(self.url_enLearners)
 
-            # redirect
-            if not DEBUG_MODE:
-                if webpage.url is not self.url_enLearners:
-                    webpage = self.fetch_webpage(self.url_en)
+        # redirect
+        if not DEBUG_MODE:
+            if webpage.url is not self.url_enLearners:
+                webpage = self.fetch_webpage(self.url_en)
 
-            if webpage == None:
-                print("> fetch_dictionary failed because fetch_webpage failed")
-                return []
-
-            if not DEBUG_MODE:
-                html_webpage = html.fromstring(webpage.content)
-            else:
-                html_webpage = html.fromstring(webpage)
-
-            html_dictionarys = self._fetch_html_dictionaries(html_webpage)
-
-            if html_dictionarys:
-                html_dsenses = self._fetch_html_dsenses(
-                    html_dictionarys[0]
-                )  # use first dictionary
-            else:
-                html_dsenses = self._fetch_html_dsenses(html_webpage)
-
-            for dsense in html_dsenses:
-                html_ddef_blocks = self._fetch_html_definition_blocks(dsense)
-
-                for block in html_ddef_blocks:
-                    definitions = self._parse_definitions(block)
-                    examples = self._parse_examples(block)
-                    translations = self._parse_translations(block)
-
-                    def_block = dict(
-                        Translations=translations,
-                        Definitions=definitions,
-                        Examples=examples,
-                    )  # create dictionary
-                    def_blocks.append(
-                        def_block
-                    )  # create a list of dictionaries, each dictionary contains one defintion block (a defintion block contains one of the word meanings)
-
-            return def_blocks
-
-        except Exception as e:
-            print(f"An error occurred: {e}")
+        if webpage == None:
+            print("> fetch_dictionary failed because fetch_webpage failed")
             return []
+
+        if not DEBUG_MODE:
+            html_webpage = html.fromstring(webpage.content)
+        else:
+            html_webpage = html.fromstring(webpage)
+
+        html_dictionarys = self._fetch_html_dictionaries(html_webpage)
+
+        if html_dictionarys:
+            html_dsenses = self._fetch_html_dsenses(html_dictionarys[0])  # use first dictionary
+        else:
+            html_dsenses = self._fetch_html_dsenses(html_webpage)
+
+        for dsense in html_dsenses:
+            html_ddef_blocks = self._fetch_html_definition_blocks(dsense)
+
+            for block in html_ddef_blocks:
+                definitions = self._parse_definitions(block)
+                examples = self._parse_examples(block)
+                translations = self._parse_translations(block)
+
+                def_block = dict(Translations=translations,Definitions=definitions,Examples=examples,)  # create dictionary
+                def_blocks.append(def_block)  # create a list of dictionaries, each dictionary contains one defintion block (a defintion block contains one of the word meanings)
+
+        return def_blocks
 
     def fetch_en2nl_dictionary(self, word):
         pass
@@ -217,14 +186,8 @@ class CambridgeDictionaryFetcher:
                         examples = self._parse_examples(block)
                         translations = self._parse_translations(block)
 
-                        def_block = dict(
-                            Translations=translations,
-                            Definitions=definitions,
-                            Examples=examples,
-                        )  # create dictionary
-                        def_blocks.append(
-                            def_block
-                        )  # create a list of dictionaries, each dictionary contains one defintion block (a defintion block contains one of the word meanings)
+                        def_block = dict(Translations=translations, Definitions=definitions, Examples=examples,)  # create dictionary
+                        def_blocks.append(def_block)  # create a list of dictionaries, each dictionary contains one defintion block (a defintion block contains one of the word meanings)
 
         return def_blocks
 
