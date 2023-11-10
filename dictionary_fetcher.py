@@ -1,4 +1,5 @@
 import requests
+from retry import retry
 from lxml import html
 
 DEBUG_MODE = False  # True, open webpage file (offline). False, request url (online).
@@ -7,11 +8,14 @@ class CambridgeDictionaryFetcher:
     def __init__(self):
         self.word = None
 
+    # Define a retry decorator with backoff strategy
+    @retry(exceptions=requests.RequestException, tries=4, delay=3, backoff=2)
     def fetch_webpage(self, url):
         """On success, return the webpage as HTML. On failure, return None."""
         if not DEBUG_MODE:
             HEADER = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.5005.63 Safari/537.36"}
             webpage = requests.get(url, headers=HEADER)
+            #webpage.raise_for_status()
 
             if webpage.status_code == 200:
                 return webpage
@@ -116,6 +120,10 @@ class CambridgeDictionaryFetcher:
         def_blocks = []
 
         webpage = self.fetch_webpage(self.url_enLearners)
+
+        if webpage == None:
+            print("> fetch_dictionary failed because fetch_webpage failed")
+            return []
 
         # redirect
         if not DEBUG_MODE:

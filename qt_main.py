@@ -4,6 +4,9 @@ from PyQt5.QtWidgets import QDialog, QApplication, QFileDialog
 from PyQt5.uic import loadUi
 from dictionary_fetcher import CambridgeDictionaryFetcher
 from ExcelFile import ExcelFile
+import requests
+import signal
+import sys
 
 class MainWindow(QDialog):
     def __init__(self):
@@ -14,6 +17,9 @@ class MainWindow(QDialog):
         self.browse_in.clicked.connect(self.browseFiles_in)
         self.browse_out.clicked.connect(self.browseFiles_out)
         self.start.clicked.connect(self.startProgram)
+
+        self.filename_in.setText(r"vocab_in.xlsx")
+        self.filename_out.setText(r"vocab_out.xlsx")
 
         self.plainTextEdit.setPlainText('Select an Excel file of which the first column contains words and the column name is "Word". \n')
 
@@ -30,9 +36,9 @@ class MainWindow(QDialog):
         self.filename_out.setText(fname[0])
 
     def startProgram(self):
-        try:
-            self.filename_in.setText(r"C:\Users\guido\Desktop\DefineVocabExcel\Vocab test.xlsx")
-            self.filename_out.setText(r"C:\Users\guido\Desktop\DefineVocabExcel\hallo.xlsx")
+        # try:
+            #self.filename_in.setText(r"C:\Users\guido\Desktop\DefineVocabExcel\Vocab test.xlsx")
+            #self.filename_out.setText(r"C:\Users\guido\Desktop\DefineVocabExcel\hallo.xlsx")
 
             # check if browse file input fields are not empty
             if self.filename_in.text() and self.filename_out.text():
@@ -65,12 +71,14 @@ class MainWindow(QDialog):
                 # create rows 
                 row_1 = ["Word"]
                 rows = []
-
+                
                 # fetch word and parse into a row
                 for i, word in enumerate(word_list):
+
                     def_blocks = CamDict.fetch_enLearner_dictionary(word)
+
                     row = [word]
-                    for j, block in enumerate(def_blocks):
+                    for j, block in enumerate(def_blocks[:3]):
                         # update first row
                         if f"Definition{j}" not in row_1:
                             row_1 += [f"Definition{j}", f"Example{j}" ]                  
@@ -79,13 +87,16 @@ class MainWindow(QDialog):
                     rows.append(row)
 
                     # save intermediate results 
-                    if ((i+1) % 20) == 0:
-                        xlsx_out.write_columnName(row_1)
+                    if ((i+1) % 10) == 0:
+                        xlsx_out.write_row(row_1)
                         xlsx_out.append_rows(rows) 
                         xlsx_out.save(str(self.filename_out.text())) 
+                        rows = []
+
+                    print(f"- {i}. {word}")
 
                 # save results and close file
-                xlsx_out.write_columnName(row_1)
+                xlsx_out.write_row(row_1)
                 xlsx_out.append_rows(rows)    
                 re = xlsx_out.save(str(self.filename_out.text()))
                 xlsx_out.close()
@@ -96,8 +107,8 @@ class MainWindow(QDialog):
                 self.plainTextEdit.appendPlainText("No file selected. \n")
                 return False            
         
-        except Exception as e:
-            print(f"Error Startprogram(): {e}")
+        # except Exception as e:
+        #     print(f"Error Startprogram(): {e}")
 
 def main():
     app = QApplication(sys.argv)
